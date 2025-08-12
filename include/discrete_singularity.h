@@ -47,8 +47,7 @@ public:
     // Get obstacle vertices
     const std::vector<Point2D>& getVertices() const { return vertices; }
     
-    // Get total circulation
-    double getTotalCirculation() const;
+
 };
 
 // Linear system solver for equations 7.1.19 and 7.1.20

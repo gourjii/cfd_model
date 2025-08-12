@@ -66,12 +66,16 @@ int main() {
     std::cout << "Obstacle: Custom shape defined by line segments" << std::endl;
     
     // Discretization parameters
-    int numSingularities = 10;
+    int numSingularities = 50;
     std::cout << "Discretization: " << numSingularities << " singularities" << std::endl;
     
-    // Flow parameters
-    double freeStreamU = 1.0;
-    double freeStreamV = 0.0;
+    // Flow parameters with an angle
+    double magnitude = 1.0;
+    double angle_degrees = 30.0;
+    double angle_radians = angle_degrees * M_PI / 180.0;
+    double freeStreamU = magnitude * cos(angle_radians);
+    double freeStreamV = magnitude * sin(angle_radians);
+    
     double totalCirculation = 0.0;
     std::cout << "Flow: free stream (" << freeStreamU << "," << freeStreamV << "), circulation=" << totalCirculation << std::endl;
     
@@ -83,8 +87,14 @@ int main() {
     // Set up the problem using line segments for the "1" shape
     // Define line segments explicitly to avoid confusion about connections
     std::vector<std::pair<CFD::Point2D, CFD::Point2D>> lineSegments = {
-        {CFD::Point2D(0, -0.5), CFD::Point2D(0, 0.5)},      // vertical line
-        {CFD::Point2D(0, 0.5), CFD::Point2D(-0.5, 0)}       // Horizontal line from top
+        //shape "1"
+        //{CFD::Point2D(0, -0.5), CFD::Point2D(0, 0.5)},      // vertical line
+        //{CFD::Point2D(0, 0.5), CFD::Point2D(-0.5, 0)}       // Horizontal line from top
+
+        // shape "zig-zag"
+        {CFD::Point2D(-0.5, 0.5), CFD::Point2D(0, 0.5)},
+        {CFD::Point2D(0, 0.5), CFD::Point2D(0, -0.5)},
+        {CFD::Point2D(0, -0.5), CFD::Point2D(0.5, -0.5)}
     };
     
     solver.setupFromLineSegments(lineSegments, numSingularities);

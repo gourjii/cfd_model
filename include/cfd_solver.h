@@ -44,7 +44,6 @@ public:
     void calculateFieldData();
     
     // Get results
-    const FieldData& getFieldData() const { return fieldData; }
     const std::vector<DiscreteSingularity>& getSingularities() const { return singularities; }
     
     // Write VTK file for visualization

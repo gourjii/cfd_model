@@ -139,7 +139,7 @@ void CFDSolver::calculateFieldData() {
             double potential = x * freeStreamVelocity.x + y * freeStreamVelocity.y;
             double streamFunction = y * freeStreamVelocity.x - x * freeStreamVelocity.y;
             
-            // Add contributions from all singularities
+            // Add contributions from all singularities for velocity
             for (const auto& singularity : singularities) {
                 // Check if point is very close to singularity
                 double distToSingularity = std::sqrt((x - singularity.position.x)*(x - singularity.position.x) + 
@@ -154,17 +154,98 @@ void CFDSolver::calculateFieldData() {
                     singularity.circulation);
                 u += vortexVel.x;
                 v += vortexVel.y;
+            }
+            
+            // Calculate potential according to equation 7.1.22'
+            // φ(x, y) = xu∞ + yv∞ + Γ₀θ_{0M}(x, y, x_{0M}, y_{0M}) + 
+            //           Σ_{j=1}^{M-1} (Σ_{k=1}^{j} Γ_k / (2π)) * 
+            //           ((y_{0j+1} - y_{0j})(x - x_j) - (x_{0j+1} - x_{0j})(y - y_j)) / R_j²
+            
+            if (!singularities.empty()) {
+                // Calculate total circulation Γ₀
+                double totalCirculation = 0.0;
+                for (const auto& singularity : singularities) {
+                    totalCirculation += singularity.circulation;
+                }
                 
-                // Potential contribution (equation 7.1.22')
-                double theta = angularFunction(x, y, 
-                    singularity.position.x, singularity.position.y);
-                potential += singularity.circulation * theta;
+                // Get the last singularity (M-th) for θ_{0M} term
+                const auto& lastSingularity = singularities.back();
+                double theta_0M = angularFunction(x, y, lastSingularity.position.x, lastSingularity.position.y);
+                potential += totalCirculation * theta_0M;
                 
-                // Stream function contribution (equation 7.1.23')
-                double psi = vortexStreamFunction(x, y, 
-                    singularity.position.x, singularity.position.y, 
-                    singularity.circulation);
-                streamFunction += psi;
+                // Calculate the summation term for j = 1 to M-1
+                for (size_t j = 0; j < singularities.size() - 1; ++j) {
+                    // Calculate inner sum Σ_{k=1}^{j} Γ_k
+                    double innerSum = 0.0;
+                    for (size_t k = 0; k <= j; ++k) {
+                        innerSum += singularities[k].circulation;
+                    }
+                    
+                    // Get coordinates for j and j+1
+                    double x_0j = singularities[j].position.x;
+                    double y_0j = singularities[j].position.y;
+                    double x_0j_plus_1 = singularities[j + 1].position.x;
+                    double y_0j_plus_1 = singularities[j + 1].position.y;
+                    
+                    // Calculate midpoint coordinates x_j, y_j (equation 7.1.24')
+                    double x_j = 0.5 * (x_0j_plus_1 + x_0j);
+                    double y_j = 0.5 * (y_0j_plus_1 + y_0j);
+                    
+                    // Calculate regularized distance R_j (equation 7.1.18')
+                    double R_j = regularizedDistance(x, y, x_j, y_j, 1e-6);
+                    
+                    // Calculate the geometric factor
+                    double numerator = (y_0j_plus_1 - y_0j) * (x - x_j) - (x_0j_plus_1 - x_0j) * (y - y_j);
+                    
+                    // Add contribution to potential
+                    potential += (innerSum / (2.0 * M_PI)) * numerator / (R_j * R_j);
+                }
+            }
+            
+            // Calculate stream function according to equation 7.1.23'
+            // ψ(x, y) = yu∞ - xv∞ - (Γ₀ / (2π)) ln(R_j²) - 
+            //           Σ_{j=1}^{M-1} (Σ_{k=1}^{j} Γ_k / (2π)) * 
+            //           ((x_{0j+1} - x_{0j})(x - x_j) + (y_{0j+1} - y_{0j})(y - y_j)) / R_j²
+            
+            if (!singularities.empty()) {
+                // Calculate total circulation Γ₀
+                double totalCirculation = 0.0;
+                for (const auto& singularity : singularities) {
+                    totalCirculation += singularity.circulation;
+                }
+                
+                // Get the last singularity (M-th) for ln(R_j²) term
+                const auto& lastSingularity = singularities.back();
+                double R_M = regularizedDistance(x, y, lastSingularity.position.x, lastSingularity.position.y, 1e-6);
+                streamFunction -= (totalCirculation / (2.0 * M_PI)) * std::log(R_M * R_M);
+                
+                // Calculate the summation term for j = 1 to M-1
+                for (size_t j = 0; j < singularities.size() - 1; ++j) {
+                    // Calculate inner sum Σ_{k=1}^{j} Γ_k
+                    double innerSum = 0.0;
+                    for (size_t k = 0; k <= j; ++k) {
+                        innerSum += singularities[k].circulation;
+                    }
+                    
+                    // Get coordinates for j and j+1
+                    double x_0j = singularities[j].position.x;
+                    double y_0j = singularities[j].position.y;
+                    double x_0j_plus_1 = singularities[j + 1].position.x;
+                    double y_0j_plus_1 = singularities[j + 1].position.y;
+                    
+                    // Calculate midpoint coordinates x_j, y_j (equation 7.1.24')
+                    double x_j = 0.5 * (x_0j_plus_1 + x_0j);
+                    double y_j = 0.5 * (y_0j_plus_1 + y_0j);
+                    
+                    // Calculate regularized distance R_j (equation 7.1.18')
+                    double R_j = regularizedDistance(x, y, x_j, y_j, 1e-6);
+                    
+                    // Calculate the geometric factor (different from potential)
+                    double numerator = (x_0j_plus_1 - x_0j) * (x - x_j) + (y_0j_plus_1 - y_0j) * (y - y_j);
+                    
+                    // Add contribution to stream function
+                    streamFunction -= (innerSum / (2.0 * M_PI)) * numerator / (R_j * R_j);
+                }
             }
             
             // Store field data

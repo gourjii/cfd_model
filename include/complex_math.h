@@ -36,7 +36,6 @@ Point2D vortexVelocity(double x, double y, double x0, double y0, double circulat
 // Stream function contribution from a point vortex
 double vortexStreamFunction(double x, double y, double x0, double y0, double circulation, double epsilon = 1e-6);
 
-// Detailed analysis of vortex field at a point
-void analyzeVortexField(double x, double y, double x0, double y0, double circulation, double epsilon = 1e-6);
+
 
 } // namespace CFD 

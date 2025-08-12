@@ -116,13 +116,7 @@ void ObstacleContour::generateDiscretization(int numSingularities) {
               << collocationPoints.size() << " collocation points" << std::endl;
 }
 
-double ObstacleContour::getTotalCirculation() const {
-    double total = 0.0;
-    for (const auto& singularity : singularities) {
-        total += singularity.circulation;
-    }
-    return total;
-}
+
 
 // Linear System Solver Implementation
 
