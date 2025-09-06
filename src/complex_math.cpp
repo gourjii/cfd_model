@@ -4,24 +4,29 @@
 namespace CFD {
 
 double angularFunction(double x, double y, double x0, double y0) {
-    // Equation 7.1.14: θ_j(x,y) = (1/(2π)) arg(z - ω_0j)
+    // Equation 7.1.14: θ_j(x,y) with 4 cases based on quadrant position
     double dx = x - x0;
     double dy = y - y0;
     
-    // Handle the case when point coincides with singularity
-    if (std::abs(dx) < 1e-12 && std::abs(dy) < 1e-12) {
-        return 0.0;
+    // Case 1: x > x₀, y ≥ y₀
+    if (dx > 0 && dy >= 0) {
+        return (1.0 / (2.0 * M_PI)) * std::atan2(dy, dx);
+    }
+    // Case 2: x < x₀, y > y₀  
+    else if (dx < 0 && dy > 0) {
+        return (1.0 / (2.0 * M_PI)) * (M_PI - std::atan2(dy, -dx));
+    }
+    // Case 3: x ≤ x₀, y ≤ y₀
+    else if (dx <= 0 && dy <= 0) {
+        return (1.0 / (2.0 * M_PI)) * (M_PI + std::atan2(-dy, -dx));
+    }
+    // Case 4: x > x₀, y < y₀
+    else if (dx > 0 && dy < 0) {
+        return (1.0 / (2.0 * M_PI)) * (2.0 * M_PI - std::atan2(-dy, dx));
     }
     
-    // Calculate angle based on quadrant
-    double angle = std::atan2(dy, dx);
-    
-    // Normalize to [0, 1] range (instead of [-π, π])
-    if (angle < 0) {
-        angle += 2.0 * M_PI;
-    }
-    
-    return angle / (2.0 * M_PI);
+    // This should never be reached, but return 0 as fallback
+    return 0.0;
 }
 
 double regularizedDistance(double x, double y, double x0, double y0, double epsilon) {

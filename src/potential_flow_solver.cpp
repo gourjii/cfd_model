@@ -66,7 +66,7 @@ int main() {
     std::cout << "Obstacle: Custom shape defined by line segments" << std::endl;
     
     // Discretization parameters
-    int numSingularities = 50;
+    int numSingularities = 30;
     std::cout << "Discretization: " << numSingularities << " singularities" << std::endl;
     
     // Flow parameters with an angle
@@ -84,7 +84,6 @@ int main() {
     // Create CFD solver
     CFD::CFDSolver solver(nx, ny, dx, dy);
     
-    // Set up the problem using line segments for the "1" shape
     // Define line segments explicitly to avoid confusion about connections
     std::vector<std::pair<CFD::Point2D, CFD::Point2D>> lineSegments = {
         //shape "1"
