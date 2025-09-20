@@ -21,7 +21,7 @@ struct FieldData {
 
 // Main CFD solver class
 class CFDSolver {
-private:
+protected:
     ObstacleContour obstacle;
     std::vector<DiscreteSingularity> singularities;
     std::vector<CollocationPoint> collocationPoints;
@@ -38,13 +38,22 @@ public:
     void setTotalCirculation(double circulation);
     
     // Solve the problem
-    void solve();
+    virtual void solve();
     
     // Calculate field data
-    void calculateFieldData();
+    virtual void calculateFieldData();
     
     // Get results
     const std::vector<DiscreteSingularity>& getSingularities() const { return singularities; }
+    const ObstacleContour& getObstacleContour() const { return obstacle; }
+    
+    // Get flow parameters
+    double getFreeStreamU() const { return freeStreamVelocity.x; }
+    double getFreeStreamV() const { return freeStreamVelocity.y; }
+    double getTotalCirculation() const { return totalCirculation; }
+    
+    // Update boundary vortex circulations (for unsteady solver)
+    void updateBoundaryVortexCirculations(const std::vector<double>& circulations);
     
     // Write VTK file for visualization
     void writeVTKFile(const std::string& filename);

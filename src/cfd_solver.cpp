@@ -8,6 +8,7 @@
 #include <numeric>
 #include <iomanip>
 #include <sstream>
+#include <filesystem>
 
 namespace CFD {
 
@@ -289,6 +290,10 @@ void CFDSolver::calculateFieldData() {
 }
 
 void CFDSolver::writeVTKFile(const std::string& filename) {
+    // Create directory if it doesn't exist
+    std::filesystem::path filePath(filename);
+    std::filesystem::create_directories(filePath.parent_path());
+    
     std::ofstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file " << filename << std::endl;
@@ -365,6 +370,10 @@ void CFDSolver::writeVTKFile(const std::string& filename) {
 
 
 void CFDSolver::writeThickObstacleVTKFile(const std::string& filename) {
+    // Create directory if it doesn't exist
+    std::filesystem::path filePath(filename);
+    std::filesystem::create_directories(filePath.parent_path());
+    
     std::ofstream file(filename);
     if (!file.is_open()) {
         std::cerr << "Error: Could not open file " << filename << std::endl;
@@ -490,6 +499,25 @@ void CFDSolver::printSolutionInfo() const {
         total += s.circulation;
     }
     std::cout << "Sum of circulations: " << total << std::endl;
+}
+
+void CFDSolver::updateBoundaryVortexCirculations(const std::vector<double>& circulations) {
+    if (circulations.size() != singularities.size()) {
+        std::cerr << "ERROR: Circulation vector size (" << circulations.size() 
+                  << ") doesn't match number of singularities (" << singularities.size() << ")" << std::endl;
+        return;
+    }
+    
+    // Update circulation values
+    for (size_t i = 0; i < singularities.size(); ++i) {
+        singularities[i].circulation = circulations[i];
+    }
+    
+    // Also update the obstacle contour's singularities
+    auto& obstacleSingularities = const_cast<std::vector<DiscreteSingularity>&>(obstacle.getSingularities());
+    for (size_t i = 0; i < obstacleSingularities.size(); ++i) {
+        obstacleSingularities[i].circulation = circulations[i];
+    }
 }
 
 } // namespace CFD 

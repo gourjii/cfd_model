@@ -14,16 +14,24 @@ find_package(Eigen3 REQUIRED)
 # Add executables
 add_executable(potential_flow_solver src/potential_flow_solver.cpp src/cfd_solver.cpp src/discrete_singularity.cpp src/complex_math.cpp)
 
+# Add unsteady vortex solver executable
+add_executable(unsteady_vortex_solver src/unsteady_vortex_main.cpp src/cfd_solver.cpp src/discrete_singularity.cpp src/complex_math.cpp src/moving_vortex.cpp src/unsteady_vortex_solver.cpp)
+
 # Set output directory
 set_target_properties(potential_flow_solver PROPERTIES
+    RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
+)
+set_target_properties(unsteady_vortex_solver PROPERTIES
     RUNTIME_OUTPUT_DIRECTORY ${CMAKE_BINARY_DIR}/bin
 )
 
 # Include directories
 target_include_directories(potential_flow_solver PRIVATE include)
+target_include_directories(unsteady_vortex_solver PRIVATE include)
 
 # Link Eigen3
 target_link_libraries(potential_flow_solver Eigen3::Eigen)
+target_link_libraries(unsteady_vortex_solver Eigen3::Eigen)
 
 # Print configuration info
 message(STATUS "C++ Compiler: ${CMAKE_CXX_COMPILER}")

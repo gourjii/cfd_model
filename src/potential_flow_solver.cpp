@@ -11,7 +11,8 @@ std::string generateTimestampedFilename(const std::string& experimentName) {
     auto tm = *std::localtime(&time_t);
     
     std::ostringstream oss;
-    oss << "output/" 
+    // Use relative path that works from build directory
+    oss << "../output/static_flow/" 
         << std::put_time(&tm, "%Y%m%d_%H%M%S") 
         << "_" << experimentName << ".vtk";
     
