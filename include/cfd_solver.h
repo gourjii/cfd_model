@@ -57,6 +57,7 @@ public:
     
     // Write VTK file for visualization
     void writeVTKFile(const std::string& filename);
+    void writeVTKFile(const std::string& filename, double timeValue);
     
     // Write obstacle as thick tube representation for better visibility
     void writeThickObstacleVTKFile(const std::string& filename);

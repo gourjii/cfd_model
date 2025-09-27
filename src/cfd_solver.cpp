@@ -290,6 +290,10 @@ void CFDSolver::calculateFieldData() {
 }
 
 void CFDSolver::writeVTKFile(const std::string& filename) {
+    writeVTKFile(filename, 0.0); // Default time value for static solver
+}
+
+void CFDSolver::writeVTKFile(const std::string& filename, double timeValue) {
     // Create directory if it doesn't exist
     std::filesystem::path filePath(filename);
     std::filesystem::create_directories(filePath.parent_path());
@@ -302,7 +306,7 @@ void CFDSolver::writeVTKFile(const std::string& filename) {
     
     // Write VTK header
     file << "# vtk DataFile Version 3.0\n";
-    file << "CFD 2D Potential Flow - Discrete Singularity Method\n";
+    file << "CFD 2D Potential Flow - Time: " << std::fixed << std::setprecision(3) << timeValue << "\n";
     file << "ASCII\n";
     file << "DATASET STRUCTURED_GRID\n";
     file << "DIMENSIONS " << fieldData.nx << " " << fieldData.ny << " 1\n";
@@ -317,6 +321,11 @@ void CFDSolver::writeVTKFile(const std::string& filename) {
             file << x << " " << y << " 0.0\n";
         }
     }
+    
+    // Add global field data for time information
+    file << "\nFIELD FieldData 1\n";
+    file << "TIME 1 1 double\n";
+    file << std::fixed << std::setprecision(6) << timeValue << "\n";
     
     // Write velocity field
     file << "\nPOINT_DATA " << fieldData.nx * fieldData.ny << "\n";

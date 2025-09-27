@@ -226,9 +226,9 @@ std::string UnsteadyVortexSolver::generateTimestampedFilename(const std::string&
 }
 
 void UnsteadyVortexSolver::writeTimeStepOutput() {
-    // Write flow field
+    // Write flow field with time information
     std::string flowFilename = generateTimestampedFilename("flow");
-    writeVTKFile(flowFilename);
+    writeVTKFile(flowFilename, currentTime);
     
     // Write wake vortices
     std::string wakeFilename = generateTimestampedFilename("wake");
