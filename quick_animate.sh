@@ -1,11 +1,13 @@
 #!/bin/bash
 
 # Quick CFD Animation Script
-# Simple wrapper to activate virtual environment and create animation
+# Creates animated GIF from existing unsteady simulation data
+# Usage: ./quick_animate.sh
+# Note: Run ./run_unsteady_flow.sh first to generate data
 
 set -e
 
-echo "🎬 Creating CFD Animation..."
+echo "🎬 Creating CFD Animation from existing data..."
 
 # Activate virtual environment and run animation
 source cfd_venv/bin/activate && python matplotlib_cfd_viewer.py --animate --fps 4
