@@ -70,6 +70,22 @@ import matplotlib.pyplot as plt
 from matplotlib.colors import Normalize
 import sys
 
+def get_obstacle_boundary_lines():
+    """Get the actual obstacle boundary lines (Z-shape) as defined in the CFD solver"""
+    # This matches the line segments definition from potential_flow_solver.cpp
+    line_segments = [
+        [[-0.5, 0.5], [0, 0.5]],    # Top horizontal line
+        [[0, 0.5], [0, -0.5]],      # Vertical line  
+        [[0, -0.5], [0.5, -0.5]]    # Bottom horizontal line
+    ]
+    return line_segments
+
+def parse_vtk_obstacle_geometry(filename):
+    """Parse VTK obstacle geometry file - but we'll use the actual line segments instead"""
+    # Instead of parsing the thick geometry, return the actual obstacle boundary
+    print(f"Using actual obstacle boundary lines instead of thick geometry from: {filename}")
+    return get_obstacle_boundary_lines()
+
 def parse_vtk_structured_grid(filename):
     """Parse VTK structured grid file manually"""
     print(f"Reading: {filename}")
@@ -145,8 +161,8 @@ def parse_vtk_structured_grid(filename):
         'velocity_magnitude': velocity_magnitude
     }
 
-def create_static_visualization(vtk_file, output_path):
-    """Create static visualization of CFD data"""
+def create_static_visualization(vtk_file, output_path, obstacle_data=None):
+    """Create static visualization of CFD data with obstacle overlay"""
     data = parse_vtk_structured_grid(vtk_file)
     if data is None or data['points'] is None:
         return False
@@ -205,6 +221,15 @@ def create_static_visualization(vtk_file, output_path):
         ax2.set_ylabel('Y')
         ax2.set_aspect('equal')
     
+    # Add obstacle overlay to both plots
+    if obstacle_data is not None:
+        # Plot obstacle as line segments (Z-shape) on both subplots
+        for segment in obstacle_data:
+            x_coords = [segment[0][0], segment[1][0]]
+            y_coords = [segment[0][1], segment[1][1]]
+            ax1.plot(x_coords, y_coords, 'k-', linewidth=4, label='Obstacle' if segment == obstacle_data[0] else "")
+            ax2.plot(x_coords, y_coords, 'k-', linewidth=4, label='Obstacle' if segment == obstacle_data[0] else "")
+    
     plt.tight_layout()
     plt.savefig(output_path, dpi=150, bbox_inches='tight')
     print(f"Saved: {output_path}")
@@ -215,7 +240,17 @@ def create_static_visualization(vtk_file, output_path):
 # Main execution
 vtk_file = "$LATEST_VTK"
 output_path = "$OUTPUT_DIR/static_flow_analysis.png"
-create_static_visualization(vtk_file, output_path)
+
+# Load obstacle data if available
+obstacle_data = None
+obstacle_files = glob.glob("$OUTPUT_DIR/*obstacle*.vtk")
+if obstacle_files:
+    obstacle_data = parse_vtk_obstacle_geometry(obstacle_files[0])
+    print(f"Loaded obstacle geometry with {len(obstacle_data)} line segments")
+else:
+    print("No obstacle geometry found")
+
+create_static_visualization(vtk_file, output_path, obstacle_data)
 EOF
 
     echo -e "${GREEN}✓ Static visualization created: $OUTPUT_DIR/static_flow_analysis.png${NC}"

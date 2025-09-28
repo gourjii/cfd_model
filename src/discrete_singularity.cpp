@@ -17,6 +17,9 @@ ObstacleContour ObstacleContour::createFromLineSegments(const std::vector<std::p
         return contour;
     }
     
+    // Store original line segments for VTK output
+    contour.originalLineSegments = lineSegments;
+    
     std::cout << "Creating obstacle from " << lineSegments.size() << " line segments:" << std::endl;
     for (size_t i = 0; i < lineSegments.size(); ++i) {
         const auto& segment = lineSegments[i];

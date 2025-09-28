@@ -21,8 +21,11 @@ int main() {
     
     // Define obstacle shape (same as static case for comparison)
     std::vector<std::pair<CFD::Point2D, CFD::Point2D>> lineSegments = {
-        // vertical line for testing
-        {CFD::Point2D(0, 0.5), CFD::Point2D(0, -0.5)}
+        // obstacle shape
+        {CFD::Point2D(-0.5, 0.5), CFD::Point2D(0.5, -0.5)},
+        {CFD::Point2D(0.5, -0.5), CFD::Point2D(0.5, 0.5)},
+        {CFD::Point2D(0.5, 0.5), CFD::Point2D(1.5, 0.5)},
+        {CFD::Point2D(1.5, 0.5), CFD::Point2D(1.5, -0.5)}
     };
     
     int numSingularities = 30;

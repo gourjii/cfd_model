@@ -87,14 +87,10 @@ int main() {
     
     // Define line segments explicitly to avoid confusion about connections
     std::vector<std::pair<CFD::Point2D, CFD::Point2D>> lineSegments = {
-        //shape "1"
-        //{CFD::Point2D(0, -0.5), CFD::Point2D(0, 0.5)},      // vertical line
-        //{CFD::Point2D(0, 0.5), CFD::Point2D(-0.5, 0)}       // Horizontal line from top
-
-        // shape "zig-zag"
-        {CFD::Point2D(-0.5, 0.5), CFD::Point2D(0, 0.5)},
-        {CFD::Point2D(0, 0.5), CFD::Point2D(0, -0.5)},
-        {CFD::Point2D(0, -0.5), CFD::Point2D(0.5, -0.5)}
+        // Zigzag pattern for testing
+        {CFD::Point2D(-0.5, 0.5), CFD::Point2D(0.5, -0.5)},
+        {CFD::Point2D(0.5, -0.5), CFD::Point2D(0.5, 0.5)},
+        {CFD::Point2D(0.5, 0.5), CFD::Point2D(1, 0.5)}
     };
     
     solver.setupFromLineSegments(lineSegments, numSingularities);
@@ -113,12 +109,8 @@ int main() {
     // Generate timestamped filename
     std::string filename = generateTimestampedFilename("potential_flow_discrete_singularity");
     
-    // Write VTK file for visualization
+    // Write VTK file for visualization (now includes obstacle boundary data)
     solver.writeVTKFile(filename);
-    
-    // Write thick obstacle VTK file for better visibility
-    std::string thickObstacleFilename = generateTimestampedFilename("thick_obstacle_geometry");
-    solver.writeThickObstacleVTKFile(thickObstacleFilename);
     
     // Print comprehensive experiment summary
     printExperimentSummary(solver, nx, ny, dx, dy, numSingularities, freeStreamU, freeStreamV, totalCirculation, filename);

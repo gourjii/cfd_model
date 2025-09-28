@@ -64,6 +64,13 @@ public:
     
     // Debug information
     void printSolutionInfo() const;
+
+private:
+    // Helper method to write obstacle boundary to VTK file
+    void writeObstacleBoundaryToVTK(std::ofstream& file);
+    
+    // Helper method to calculate distance from point to line segment
+    double distancePointToLineSegment(double px, double py, const Point2D& segStart, const Point2D& segEnd);
 };
 
 } // namespace CFD 

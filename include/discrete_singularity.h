@@ -30,6 +30,7 @@ private:
     std::vector<Point2D> vertices;
     std::vector<DiscreteSingularity> singularities;
     std::vector<CollocationPoint> collocationPoints;
+    std::vector<std::pair<Point2D, Point2D>> originalLineSegments;  // Store original line segments
     
 public:
     // Create obstacle from array of line segments
@@ -46,6 +47,9 @@ public:
     
     // Get obstacle vertices
     const std::vector<Point2D>& getVertices() const { return vertices; }
+    
+    // Get original line segments
+    const std::vector<std::pair<Point2D, Point2D>>& getLineSegments() const { return originalLineSegments; }
     
 
 };

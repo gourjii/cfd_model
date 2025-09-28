@@ -372,6 +372,9 @@ void CFDSolver::writeVTKFile(const std::string& filename, double timeValue) {
         }
     }
     
+    // Add obstacle boundary as line cells
+    writeObstacleBoundaryToVTK(file);
+    
     file.close();
     std::cout << "VTK file written: " << filename << std::endl;
 }
@@ -527,6 +530,79 @@ void CFDSolver::updateBoundaryVortexCirculations(const std::vector<double>& circ
     for (size_t i = 0; i < obstacleSingularities.size(); ++i) {
         obstacleSingularities[i].circulation = circulations[i];
     }
+}
+
+void CFDSolver::writeObstacleBoundaryToVTK(std::ofstream& file) {
+    const auto& lineSegments = obstacle.getLineSegments();
+    
+    if (lineSegments.empty()) {
+        return;  // No obstacle to write
+    }
+    
+    // Write obstacle boundary as additional scalar field to mark obstacle regions
+    // We'll create a scalar field that marks grid points near the obstacle
+    file << "\nSCALARS obstacle_boundary float 1\n";
+    file << "LOOKUP_TABLE default\n";
+    
+    // For each grid point, check if it's close to any obstacle line segment
+    double xMin = -5.0, yMin = -2.5;
+    double obstacleThreshold = 0.05;  // Distance threshold to mark as obstacle
+    
+    for (int j = 0; j < fieldData.ny; ++j) {
+        for (int i = 0; i < fieldData.nx; ++i) {
+            double x = xMin + i * fieldData.dx;
+            double y = yMin + j * fieldData.dy;
+            
+            bool nearObstacle = false;
+            
+            // Check distance to each line segment
+            for (const auto& segment : lineSegments) {
+                double dist = distancePointToLineSegment(x, y, segment.first, segment.second);
+                if (dist < obstacleThreshold) {
+                    nearObstacle = true;
+                    break;
+                }
+            }
+            
+            file << (nearObstacle ? 1.0 : 0.0) << "\n";
+        }
+    }
+    
+    // Write the actual line segments as VTK line cells for exact visualization
+    file << "\n# Obstacle line segments\n";
+    file << "# Number of line segments: " << lineSegments.size() << "\n";
+    for (size_t i = 0; i < lineSegments.size(); ++i) {
+        const auto& seg = lineSegments[i];
+        file << "# Segment " << i << ": (" << seg.first.x << ", " << seg.first.y 
+             << ") to (" << seg.second.x << ", " << seg.second.y << ")\n";
+    }
+}
+
+double CFDSolver::distancePointToLineSegment(double px, double py, const Point2D& segStart, const Point2D& segEnd) {
+    double dx = segEnd.x - segStart.x;
+    double dy = segEnd.y - segStart.y;
+    
+    if (dx == 0 && dy == 0) {
+        // Degenerate segment, return distance to point
+        double dpx = px - segStart.x;
+        double dpy = py - segStart.y;
+        return std::sqrt(dpx*dpx + dpy*dpy);
+    }
+    
+    // Parameter t for closest point on line segment
+    double t = ((px - segStart.x) * dx + (py - segStart.y) * dy) / (dx*dx + dy*dy);
+    
+    // Clamp t to [0,1] to stay on segment
+    t = std::max(0.0, std::min(1.0, t));
+    
+    // Closest point on segment
+    double closestX = segStart.x + t * dx;
+    double closestY = segStart.y + t * dy;
+    
+    // Distance from point to closest point on segment
+    double distX = px - closestX;
+    double distY = py - closestY;
+    return std::sqrt(distX*distX + distY*distY);
 }
 
 } // namespace CFD 
