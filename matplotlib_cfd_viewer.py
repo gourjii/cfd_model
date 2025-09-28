@@ -169,6 +169,31 @@ def parse_vtk_structured_grid(filename):
         print("No velocity data found")
         velocity_magnitude = None
     
+    # Read potential field data
+    potential_data = None
+    potential_start = None
+    
+    for i, line in enumerate(lines):
+        if 'SCALARS potential' in line:
+            # Skip the LOOKUP_TABLE line
+            potential_start = i + 2
+            break
+    
+    if potential_start is not None:
+        potential_values = []
+        for i in range(potential_start, len(lines)):
+            line = lines[i].strip()
+            if not line or line.startswith('SCALARS') or line.startswith('LOOKUP_TABLE'):
+                break
+            try:
+                potential_values.append(float(line))
+            except ValueError:
+                break
+        
+        potential_data = np.array(potential_values) if potential_values else None
+        if potential_data is not None:
+            print(f"Read potential field with {len(potential_data)} points")
+    
     # Read obstacle boundary data
     obstacle_boundary = None
     obstacle_start = None
@@ -212,6 +237,7 @@ def parse_vtk_structured_grid(filename):
         'dimensions': dimensions,
         'velocity': velocity_data,
         'velocity_magnitude': velocity_magnitude,
+        'potential': potential_data,
         'obstacle_boundary': obstacle_boundary,
         'line_segments': line_segments
     }
@@ -225,6 +251,7 @@ def create_2d_visualization(data, title="CFD Visualization", save_path=None, obs
     dims = data['dimensions']
     velocity = data['velocity']
     velocity_mag = data['velocity_magnitude']
+    potential = data.get('potential')
     
     # Extract 2D coordinates
     x = points[:, 0].reshape(dims[1], dims[0])  # Note: VTK uses different ordering
@@ -234,54 +261,43 @@ def create_2d_visualization(data, title="CFD Visualization", save_path=None, obs
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
     fig.suptitle(title, fontsize=14)
     
-    # Plot 1: Velocity magnitude contour
-    if velocity_mag is not None:
-        vel_mag_2d = velocity_mag.reshape(dims[1], dims[0])
+    # Plot 1: Potential field contour
+    if potential is not None:
+        potential_2d = potential.reshape(dims[1], dims[0])
         
         # Contour plot
-        contour = ax1.contourf(x, y, vel_mag_2d, levels=20, cmap='jet')
-        ax1.set_title('Velocity Magnitude')
+        contour = ax1.contourf(x, y, potential_2d, levels=20, cmap='RdYlBu_r')
+        ax1.set_title('Potential Field')
         ax1.set_xlabel('X')
         ax1.set_ylabel('Y')
         ax1.set_aspect('equal')
-        plt.colorbar(contour, ax=ax1, label='Velocity Magnitude')
+        plt.colorbar(contour, ax=ax1, label='Potential')
         
         # Add contour lines
-        ax1.contour(x, y, vel_mag_2d, levels=10, colors='black', alpha=0.3, linewidths=0.5)
+        ax1.contour(x, y, potential_2d, levels=10, colors='black', alpha=0.3, linewidths=0.5)
     
     # Add obstacle overlay to plot 1
     if obstacle_data is not None:
-        # Plot obstacle as line segments (Z-shape)
+        # Plot obstacle as line segments
         for segment in obstacle_data:
             x_coords = [segment[0][0], segment[1][0]]
             y_coords = [segment[0][1], segment[1][1]]
             ax1.plot(x_coords, y_coords, 'k-', linewidth=4, label='Obstacle' if segment == obstacle_data[0] else "")
     
-    # Plot 2: Velocity vectors
-    if velocity is not None:
-        u = velocity[:, 0].reshape(dims[1], dims[0])
-        v = velocity[:, 1].reshape(dims[1], dims[0])
+    # Plot 2: Velocity magnitude contour
+    if velocity_mag is not None:
+        vel_mag_2d = velocity_mag.reshape(dims[1], dims[0])
         
-        # Subsample for vector plot
-        step = max(1, dims[0] // 20)
-        x_sub = x[::step, ::step]
-        y_sub = y[::step, ::step]
-        u_sub = u[::step, ::step]
-        v_sub = v[::step, ::step]
-        
-        # Vector plot with velocity magnitude as background
-        if velocity_mag is not None:
-            vel_mag_2d = velocity_mag.reshape(dims[1], dims[0])
-            im = ax2.imshow(vel_mag_2d, extent=[x.min(), x.max(), y.min(), y.max()], 
-                           origin='lower', cmap='jet', alpha=0.7)
-            plt.colorbar(im, ax=ax2, label='Velocity Magnitude')
-        
-        # Add velocity vectors
-        ax2.quiver(x_sub, y_sub, u_sub, v_sub, scale=None, alpha=0.8, color='white', width=0.003)
-        ax2.set_title('Velocity Vectors')
+        # Contour plot
+        contour = ax2.contourf(x, y, vel_mag_2d, levels=20, cmap='jet')
+        ax2.set_title('Velocity Magnitude')
         ax2.set_xlabel('X')
         ax2.set_ylabel('Y')
         ax2.set_aspect('equal')
+        plt.colorbar(contour, ax=ax2, label='Velocity Magnitude')
+        
+        # Add contour lines
+        ax2.contour(x, y, vel_mag_2d, levels=10, colors='black', alpha=0.3, linewidths=0.5)
     
     # Add obstacle overlay to plot 2
     if obstacle_data is not None:
