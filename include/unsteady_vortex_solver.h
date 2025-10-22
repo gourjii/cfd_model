@@ -9,16 +9,20 @@
 
 namespace CFD {
 
+// ========================================================================
 // Extended linear system solver for time-dependent problems
+// Implements equation (31): System of equations for circulation strengths Γ_j(t_{n+1})
+// ========================================================================
 class UnsteadyLinearSystemSolver : public LinearSystemSolver {
 private:
-    std::vector<double> previousCirculations;  // Γ_j(t_n)
-    double timeStep;                           // Δt
+    std::vector<double> previousCirculations;  // Γ_j(t_n) - previous time step circulations
+    double timeStep;                           // Δt - current time step
     
 public:
     UnsteadyLinearSystemSolver(int numSingularities);
     
-    // Build system with time-dependent terms (equations from slides 15-21)
+    // Build system with time-dependent terms (Equation 31)
+    // Solves: ∑_{j=1}^M Γ_j(t_{n+1})[V̄_j · n̄_k] = -[V̄_∞ · n̄_k] - ∑_p ∑_i γ_i^p[V̄_i^p · n̄_k]
     void buildUnsteadySystem(const std::vector<DiscreteSingularity>& boundaryVortices,
                            const std::vector<MovingVortex>& wakeVortices,
                            const std::vector<CollocationPoint>& collocationPoints,

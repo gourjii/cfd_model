@@ -22,10 +22,7 @@ int main() {
     // Define obstacle shape (same as static case for comparison)
     std::vector<std::pair<CFD::Point2D, CFD::Point2D>> lineSegments = {
         // obstacle shape
-        {CFD::Point2D(-0.5, 0.5), CFD::Point2D(0.5, -0.5)},
-        {CFD::Point2D(0.5, -0.5), CFD::Point2D(0.5, 0.5)},
-        {CFD::Point2D(0.5, 0.5), CFD::Point2D(1.5, 0.5)},
-        {CFD::Point2D(1.5, 0.5), CFD::Point2D(1.5, -0.5)}
+        {CFD::Point2D(0, 0.5), CFD::Point2D(0, -0.5)}
     };
     
     int numSingularities = 30;
@@ -45,7 +42,7 @@ int main() {
     // Time integration parameters
     CFD::TimeIntegrationParams timeParams;
     timeParams.timeStep = 0.02;
-    timeParams.totalTime = 1.0;  // Shorter test run
+    timeParams.totalTime = 7.0;  // Shorter test run
     timeParams.outputInterval = 0.1;
     timeParams.adaptiveTimeStep = false;
     
