@@ -52,6 +52,7 @@ private:
     std::unique_ptr<VortexTracker> vortexTracker;
     VortexSheddingParams sheddingParams;
     double lastSheddingTime;
+    std::vector<Point2D> geometricVertices;  // Geometric vertices where vortices are shed
     
     // Dynamic solver
     std::unique_ptr<UnsteadyLinearSystemSolver> unsteadySolver;
@@ -88,6 +89,7 @@ public:
     void setTimeIntegrationParams(const TimeIntegrationParams& params);
     void setVortexSheddingParams(const VortexSheddingParams& params);
     void setBaseOutputName(const std::string& name) { baseOutputName = name; }
+    void setGeometricVertices(const std::vector<Point2D>& vertices) { geometricVertices = vertices; }
     
     // Main simulation methods
     void initializeUnsteadySolution();

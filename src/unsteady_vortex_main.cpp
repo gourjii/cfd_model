@@ -23,10 +23,52 @@ int main() {
     std::vector<std::pair<CFD::Point2D, CFD::Point2D>> lineSegments = {
         // obstacle shape
         {CFD::Point2D(0, 0.5), CFD::Point2D(0, -0.5)}
+        // {CFD::Point2D(-0.5, 0.5), CFD::Point2D(0, 0.5)},      // Top segment
+       // {CFD::Point2D(0, 0.5), CFD::Point2D(0.5, 0)},         // Upper diagonal
+       // {CFD::Point2D(0.5, 0), CFD::Point2D(0, -0.5)},        // Lower diagonal
+       // {CFD::Point2D(0, -0.5), CFD::Point2D(-0.5, -0.5)}     // Bottom segment
     };
     
+    // Extract geometric vertices (unique points from line segments)
+    // These are the points where vortices will be shed
+    std::vector<CFD::Point2D> geometricVertices;
+    for (const auto& segment : lineSegments) {
+        // Add start point if not already present
+        bool startExists = false;
+        for (const auto& v : geometricVertices) {
+            if (std::abs(v.x - segment.first.x) < 1e-10 && 
+                std::abs(v.y - segment.first.y) < 1e-10) {
+                startExists = true;
+                break;
+            }
+        }
+        if (!startExists) {
+            geometricVertices.push_back(segment.first);
+        }
+        
+        // Add end point if not already present
+        bool endExists = false;
+        for (const auto& v : geometricVertices) {
+            if (std::abs(v.x - segment.second.x) < 1e-10 && 
+                std::abs(v.y - segment.second.y) < 1e-10) {
+                endExists = true;
+                break;
+            }
+        }
+        if (!endExists) {
+            geometricVertices.push_back(segment.second);
+        }
+    }
+    
+    std::cout << "Geometric vertices for vortex shedding: " << geometricVertices.size() << std::endl;
+    
+    // Use higher discretization for accurate flow field calculation
+    // But vortices will only be shed from geometric vertices
     int numSingularities = 30;
     solver.setupFromLineSegments(lineSegments, numSingularities);
+    
+    // Set geometric vertices for vortex shedding
+    solver.setGeometricVertices(geometricVertices);
     
     // Flow parameters
     double magnitude = 1.0;
@@ -42,7 +84,7 @@ int main() {
     // Time integration parameters
     CFD::TimeIntegrationParams timeParams;
     timeParams.timeStep = 0.02;
-    timeParams.totalTime = 7.0;  // Shorter test run
+    timeParams.totalTime = 1.0;
     timeParams.outputInterval = 0.1;
     timeParams.adaptiveTimeStep = false;
     
@@ -51,9 +93,9 @@ int main() {
     // Vortex shedding parameters
     CFD::VortexSheddingParams sheddingParams;
     sheddingParams.enableShedding = true;
-    sheddingParams.sheddingStrength = 0.5;
-    sheddingParams.sheddingInterval = 0.2;
-    sheddingParams.sheddingLocation = CFD::Point2D(0.6, 0.0);  // Behind the obstacle
+    sheddingParams.sheddingStrength = 0.5;  // Base strength (not used in universal shedding)
+    sheddingParams.sheddingInterval = 0.0;  // Not used - shedding occurs every time step
+    sheddingParams.sheddingLocation = CFD::Point2D(0.0, 0.0);  // Not used - all points shed
     
     solver.setVortexSheddingParams(sheddingParams);
     
@@ -62,8 +104,7 @@ int main() {
     
     std::cout << "Flow: free stream (" << freeStreamU << "," << freeStreamV << ")" << std::endl;
     std::cout << "Time integration: dt=" << timeParams.timeStep << ", total=" << timeParams.totalTime << std::endl;
-    std::cout << "Vortex shedding: strength=" << sheddingParams.sheddingStrength 
-              << ", interval=" << sheddingParams.sheddingInterval << std::endl;
+    std::cout << "Vortex shedding: UNIVERSAL MODE - all boundary points shed vortices every time step" << std::endl;
     
     std::cout << "\n" << std::string(60, '=') << std::endl;
     

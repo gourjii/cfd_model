@@ -300,6 +300,12 @@ void UnsteadyVortexSolver::updateVortexPositions() {
 // Creates new discrete vortices in the wake to model flow separation
 // Implements Karman vortex street with alternating circulation signs
 // ========================================================================
+// FORMULA REFERENCE: Equation (42) and (46) from mathematical documentation
+// Universal vortex shedding: Each boundary point sheds one vortex per time step
+// New vortex position: x_i^p(t_{n+1}) = x_i^p(t_n) + u(x_i^p(t_n), y_i^p(t_n), t_n)(t_{n+1} - t_n)
+// Circulation conservation: ∑Γ_j(t_n) = -∑∑γ_i^p
+// Each shed vortex carries circulation: γ_new = Γ_j(t_n)
+// ========================================================================
 void UnsteadyVortexSolver::shedNewVortices() {
     if (!sheddingParams.enableShedding) {
         return;
@@ -307,48 +313,80 @@ void UnsteadyVortexSolver::shedNewVortices() {
     
     std::cout << "Shedding new vortices at t=" << currentTime << std::endl;
     
-    // Get obstacle geometry to find shedding locations
-    const auto& collocationPoints = getObstacleContour().getCollocationPoints();
+    // Get boundary singularities (vortex elements on obstacle surface)
+    const auto& boundaryVortices = getObstacleContour().getSingularities();
     
-    if (collocationPoints.empty()) {
+    if (boundaryVortices.empty() || geometricVertices.empty()) {
         return;
     }
     
-    // Calculate shedding location (typically trailing edge or corners)
-    Point2D sheddingPos = calculateSheddingLocation();
+    // Shed one vortex from each GEOMETRIC VERTEX (not from all discretization points)
+    // Following Equation (42): each geometric vertex generates one wake vortex
+    int vorticesAdded = 0;
     
-    // Calculate circulation strength based on local flow conditions
-    double circulation = calculateSheddingStrength();
-    
-    // Alternate sign for Karman vortex street effect
-    // This creates the characteristic alternating vortex pattern
-    static int sheddingCounter = 0;
-    double sign = (sheddingCounter % 2 == 0) ? 1.0 : -1.0;
-    sheddingCounter++;
-    
-    // Shed vortices from both upper and lower sides for realistic wake
-    // Upper vortex (positive y offset)
-    Point2D upperPos = sheddingPos;
-    upperPos.y += 0.1; // Offset from centerline
-    MovingVortex upperVortex(upperPos, sign * circulation, currentTime);
-    vortexTracker->addVortex(upperVortex);
-    
-    // Lower vortex (negative y offset, opposite circulation)
-    Point2D lowerPos = sheddingPos;
-    lowerPos.y -= 0.1; // Offset from centerline
-    MovingVortex lowerVortex(lowerPos, -sign * circulation, currentTime);
-    vortexTracker->addVortex(lowerVortex);
+    for (const auto& vertex : geometricVertices) {
+        // Find the nearest boundary singularity to this geometric vertex
+        size_t nearestIdx = 0;
+        double minDist = std::numeric_limits<double>::max();
+        
+        for (size_t j = 0; j < boundaryVortices.size(); ++j) {
+            const auto& singularity = boundaryVortices[j];
+            double dx = singularity.position.x - vertex.x;
+            double dy = singularity.position.y - vertex.y;
+            double dist = std::sqrt(dx*dx + dy*dy);
+            
+            if (dist < minDist) {
+                minDist = dist;
+                nearestIdx = j;
+            }
+        }
+        
+        // Use the circulation from the nearest boundary singularity
+        const auto& nearestSingularity = boundaryVortices[nearestIdx];
+        double circulation = nearestSingularity.circulation;
+        
+        // Calculate flow velocity at this geometric vertex using Equation (41)
+        // V̄(x,y,t_n) = V̄_∞ + ∑Γ_j(t_n)V̄(x,y,x_{0j},y_{0j}) + ∑∑γ_i^p V̄(x,y,x_i^p(t_n),y_i^p(t_n))
+        Point2D velocity = calculateVortexVelocity(vertex);
+        
+        // Initial position: slightly offset in flow direction to avoid singularity
+        // Following Equation (42): offset = V̄(x_j, y_j, t_n) * Δt
+        Point2D initialPos = vertex;
+        double offsetMag = 0.05; // Small offset to prevent numerical singularity
+        double velMag = std::sqrt(velocity.x*velocity.x + velocity.y*velocity.y);
+        
+        if (velMag > 1e-6) {
+            // Offset in direction of flow
+            initialPos.x += offsetMag * velocity.x / velMag;
+            initialPos.y += offsetMag * velocity.y / velMag;
+        } else {
+            // Fallback: offset in free stream direction
+            double freeStreamMag = std::sqrt(getFreeStreamU()*getFreeStreamU() + 
+                                            getFreeStreamV()*getFreeStreamV());
+            if (freeStreamMag > 1e-6) {
+                initialPos.x += offsetMag * getFreeStreamU() / freeStreamMag;
+                initialPos.y += offsetMag * getFreeStreamV() / freeStreamMag;
+            }
+        }
+        
+        // Create and add new wake vortex with circulation from nearest boundary point
+        // sourcePanel parameter tracks which boundary point created this vortex
+        MovingVortex newVortex(initialPos, circulation, currentTime, static_cast<int>(nearestIdx));
+        vortexTracker->addVortex(newVortex);
+        vorticesAdded++;
+    }
     
     // Update last shedding time
     lastSheddingTime = currentTime;
     
-    std::cout << "  Added vortex pair with circulation ±" << circulation 
-              << " at (" << sheddingPos.x << ", " << sheddingPos.y << "±0.1)" << std::endl;
+    std::cout << "  Added " << vorticesAdded << " wake vortices (one per geometric vertex)" << std::endl;
 }
 
 bool UnsteadyVortexSolver::shouldShedVortex() const {
-    // TODO: Implement shedding criteria
-    return (currentTime - lastSheddingTime) >= sheddingParams.sheddingInterval;
+    // Universal shedding: shed vortices at every time step
+    // Following the mathematical model from slides 17-20, each boundary point
+    // generates one vortex per time step to maintain circulation conservation
+    return true;
 }
 
 // ========================================================================
