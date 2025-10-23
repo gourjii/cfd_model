@@ -219,6 +219,31 @@ def parse_vtk_structured_grid(filename):
         if obstacle_boundary is not None:
             print(f"Read obstacle boundary field with {len(obstacle_boundary)} points")
     
+    # Read pressure coefficient data (Equation 50)
+    pressure_coefficient = None
+    pressure_start = None
+    
+    for i, line in enumerate(lines):
+        if 'SCALARS pressure_coefficient' in line:
+            # Skip the LOOKUP_TABLE line
+            pressure_start = i + 2
+            break
+    
+    if pressure_start is not None:
+        pressure_values = []
+        for i in range(pressure_start, len(lines)):
+            line = lines[i].strip()
+            if not line or line.startswith('SCALARS') or line.startswith('LOOKUP_TABLE'):
+                break
+            try:
+                pressure_values.append(float(line))
+            except ValueError:
+                break
+        
+        pressure_coefficient = np.array(pressure_values) if pressure_values else None
+        if pressure_coefficient is not None:
+            print(f"Read pressure coefficient field with {len(pressure_coefficient)} points")
+    
     # Parse line segments from comments
     line_segments = []
     for line in lines:
@@ -239,6 +264,7 @@ def parse_vtk_structured_grid(filename):
         'velocity_magnitude': velocity_magnitude,
         'potential': potential_data,
         'obstacle_boundary': obstacle_boundary,
+        'pressure_coefficient': pressure_coefficient,
         'line_segments': line_segments
     }
 
@@ -275,19 +301,19 @@ def add_wake_vortices_to_plot(ax, vtk_filename):
     wake_vortices = parse_vtk_wake_vortices(wake_filename)
     if wake_vortices is not None and len(wake_vortices) > 0:
         ax.scatter(wake_vortices[:, 0], wake_vortices[:, 1], 
-                  c='red', s=30, marker='o', edgecolors='darkred', 
+                  c='red', s=12, marker='o', edgecolors='darkred', 
                   linewidths=1, zorder=10, alpha=0.9)
 
 def create_2d_visualization(data, title="CFD Visualization", save_path=None, obstacle_data=None, vtk_filename=None):
-    """Create 2D visualization of CFD data with obstacle overlay"""
+    """Create 2D visualization of CFD data with obstacle overlay - Potential + Pressure"""
     if data is None or data['points'] is None:
         return None
     
     points = data['points']
     dims = data['dimensions']
     velocity = data['velocity']
-    velocity_mag = data['velocity_magnitude']
     potential = data.get('potential')
+    pressure_coefficient = data.get('pressure_coefficient')
     
     # Extract 2D coordinates
     x = points[:, 0].reshape(dims[1], dims[0])  # Note: VTK uses different ordering
@@ -297,20 +323,26 @@ def create_2d_visualization(data, title="CFD Visualization", save_path=None, obs
     fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(16, 6))
     fig.suptitle(title, fontsize=14)
     
-    # Plot 1: Potential field contour
+    # Plot 1: Potential field + velocity vectors
     if potential is not None:
         potential_2d = potential.reshape(dims[1], dims[0])
         
         # Contour plot
         contour = ax1.contourf(x, y, potential_2d, levels=20, cmap='RdYlBu_r')
-        ax1.set_title('Potential Field')
+        ax1.set_title('Potential Field φ + Velocity Vectors')
         ax1.set_xlabel('X')
         ax1.set_ylabel('Y')
         ax1.set_aspect('equal')
-        plt.colorbar(contour, ax=ax1, label='Potential')
+        plt.colorbar(contour, ax=ax1, label='Potential φ')
         
-        # Add contour lines
-        ax1.contour(x, y, potential_2d, levels=10, colors='black', alpha=0.3, linewidths=0.5)
+        # Add velocity vectors
+        if velocity is not None:
+            u = velocity[:, 0].reshape(dims[1], dims[0])
+            v = velocity[:, 1].reshape(dims[1], dims[0])
+            step = max(1, dims[0] // 15)
+            ax1.quiver(x[::step, ::step], y[::step, ::step], 
+                      u[::step, ::step], v[::step, ::step],
+                      scale=None, alpha=0.7, color='black', width=0.002)
     
     # Add obstacle overlay to plot 1
     if obstacle_data is not None:
@@ -320,24 +352,30 @@ def create_2d_visualization(data, title="CFD Visualization", save_path=None, obs
             y_coords = [segment[0][1], segment[1][1]]
             ax1.plot(x_coords, y_coords, 'k-', linewidth=4, label='Obstacle' if segment == obstacle_data[0] else "")
     
-    # Plot 2: Velocity magnitude contour
-    if velocity_mag is not None:
-        vel_mag_2d = velocity_mag.reshape(dims[1], dims[0])
+    # Plot 2: Pressure coefficient + velocity vectors
+    if pressure_coefficient is not None:
+        pressure_2d = pressure_coefficient.reshape(dims[1], dims[0])
         
         # Contour plot
-        contour = ax2.contourf(x, y, vel_mag_2d, levels=20, cmap='jet')
-        ax2.set_title('Velocity Magnitude')
+        contour = ax2.contourf(x, y, pressure_2d, levels=20, cmap='coolwarm')
+        ax2.set_title('Pressure Coefficient C_P + Velocity Vectors (Eq. 50)')
         ax2.set_xlabel('X')
         ax2.set_ylabel('Y')
         ax2.set_aspect('equal')
-        plt.colorbar(contour, ax=ax2, label='Velocity Magnitude')
+        plt.colorbar(contour, ax=ax2, label='Pressure Coefficient C_P')
         
-        # Add contour lines
-        ax2.contour(x, y, vel_mag_2d, levels=10, colors='black', alpha=0.3, linewidths=0.5)
+        # Add velocity vectors
+        if velocity is not None:
+            u = velocity[:, 0].reshape(dims[1], dims[0])
+            v = velocity[:, 1].reshape(dims[1], dims[0])
+            step = max(1, dims[0] // 15)
+            ax2.quiver(x[::step, ::step], y[::step, ::step], 
+                      u[::step, ::step], v[::step, ::step],
+                      scale=None, alpha=0.7, color='black', width=0.002)
     
     # Add obstacle overlay to plot 2
     if obstacle_data is not None:
-        # Plot obstacle as line segments (Z-shape)
+        # Plot obstacle as line segments
         for segment in obstacle_data:
             x_coords = [segment[0][0], segment[1][0]]
             y_coords = [segment[0][1], segment[1][1]]
@@ -357,7 +395,7 @@ def create_2d_visualization(data, title="CFD Visualization", save_path=None, obs
     return fig
 
 def create_animation(vtk_files, output_path="cfd_animation.gif", fps=2, obstacle_data=None):
-    """Create animated GIF from VTK files with obstacle overlay"""
+    """Create animated GIF from VTK files with side-by-side potential and pressure plots"""
     print(f"Creating animation from {len(vtk_files)} frames...")
     
     # Read first frame to set up plot
@@ -365,10 +403,19 @@ def create_animation(vtk_files, output_path="cfd_animation.gif", fps=2, obstacle
     if first_data is None:
         return False
     
-    fig, ax = plt.subplots(figsize=(12, 8))
+    # Create figure with two subplots side by side
+    fig, (ax1, ax2) = plt.subplots(1, 2, figsize=(18, 7))
+    
+    # Store colorbars to update them
+    cbar1 = None
+    cbar2 = None
     
     def animate(frame_idx):
-        ax.clear()
+        nonlocal cbar1, cbar2
+        
+        # Clear both axes
+        ax1.clear()
+        ax2.clear()
         
         # Read data for this frame
         data = parse_vtk_structured_grid(vtk_files[frame_idx])
@@ -377,18 +424,22 @@ def create_animation(vtk_files, output_path="cfd_animation.gif", fps=2, obstacle
         
         points = data['points']
         dims = data['dimensions']
-        velocity_mag = data['velocity_magnitude']
         velocity = data['velocity']
+        potential = data.get('potential')
+        pressure_coefficient = data.get('pressure_coefficient')
         
         # Extract 2D coordinates
         x = points[:, 0].reshape(dims[1], dims[0])
         y = points[:, 1].reshape(dims[1], dims[0])
         
-        if velocity_mag is not None:
-            vel_mag_2d = velocity_mag.reshape(dims[1], dims[0])
+        # LEFT PLOT: Potential field + velocity vectors
+        if potential is not None:
+            potential_2d = potential.reshape(dims[1], dims[0])
             
             # Contour plot
-            contour = ax.contourf(x, y, vel_mag_2d, levels=20, cmap='jet')
+            contour1 = ax1.contourf(x, y, potential_2d, levels=20, cmap='RdYlBu_r')
+            if cbar1 is None:
+                cbar1 = plt.colorbar(contour1, ax=ax1, label='Potential φ')
             
             # Add velocity vectors
             if velocity is not None:
@@ -397,35 +448,61 @@ def create_animation(vtk_files, output_path="cfd_animation.gif", fps=2, obstacle
                 
                 # Subsample for vector plot
                 step = max(1, dims[0] // 15)
-                x_sub = x[::step, ::step]
-                y_sub = y[::step, ::step]
-                u_sub = u[::step, ::step]
-                v_sub = v[::step, ::step]
-                
-                ax.quiver(x_sub, y_sub, u_sub, v_sub, scale=None, alpha=0.8, 
-                         color='white', width=0.002)
+                ax1.quiver(x[::step, ::step], y[::step, ::step], 
+                          u[::step, ::step], v[::step, ::step],
+                          scale=None, alpha=0.7, color='black', width=0.002)
         
-        # Add obstacle overlay
+        ax1.set_title('Potential Field φ + Velocity Vectors')
+        ax1.set_xlabel('X')
+        ax1.set_ylabel('Y')
+        ax1.set_aspect('equal')
+        
+        # RIGHT PLOT: Pressure coefficient + velocity vectors
+        if pressure_coefficient is not None:
+            pressure_2d = pressure_coefficient.reshape(dims[1], dims[0])
+            
+            # Contour plot
+            contour2 = ax2.contourf(x, y, pressure_2d, levels=20, cmap='coolwarm')
+            if cbar2 is None:
+                cbar2 = plt.colorbar(contour2, ax=ax2, label='C_P')
+            
+            # Add velocity vectors
+            if velocity is not None:
+                u = velocity[:, 0].reshape(dims[1], dims[0])
+                v = velocity[:, 1].reshape(dims[1], dims[0])
+                
+                # Subsample for vector plot
+                step = max(1, dims[0] // 15)
+                ax2.quiver(x[::step, ::step], y[::step, ::step], 
+                          u[::step, ::step], v[::step, ::step],
+                          scale=None, alpha=0.7, color='black', width=0.002)
+        
+        ax2.set_title('Pressure Coefficient C_P + Velocity (Eq. 50)')
+        ax2.set_xlabel('X')
+        ax2.set_ylabel('Y')
+        ax2.set_aspect('equal')
+        
+        # Add obstacle overlay to both plots
         if obstacle_data is not None:
-            # Plot obstacle as line segments (Z-shape)
             for segment in obstacle_data:
                 x_coords = [segment[0][0], segment[1][0]]
                 y_coords = [segment[0][1], segment[1][1]]
-                ax.plot(x_coords, y_coords, 'k-', linewidth=4)
+                ax1.plot(x_coords, y_coords, 'k-', linewidth=4)
+                ax2.plot(x_coords, y_coords, 'k-', linewidth=4)
         
-        # Add wake vortices overlay
+        # Add wake vortices overlay to both plots
         wake_filename = vtk_files[frame_idx].replace('_flow_flow_', '_flow_wake_')
         wake_vortices = parse_vtk_wake_vortices(wake_filename)
         if wake_vortices is not None and len(wake_vortices) > 0:
-            ax.scatter(wake_vortices[:, 0], wake_vortices[:, 1], 
-                      c='red', s=30, marker='o', edgecolors='darkred', 
-                      linewidths=1, zorder=10, alpha=0.9)
+            ax1.scatter(wake_vortices[:, 0], wake_vortices[:, 1], 
+                       c='red', s=12, marker='o', edgecolors='darkred', 
+                       linewidths=1, zorder=10, alpha=0.9, label='Wake Vortices')
+            ax2.scatter(wake_vortices[:, 0], wake_vortices[:, 1], 
+                       c='red', s=12, marker='o', edgecolors='darkred', 
+                       linewidths=1, zorder=10, alpha=0.9)
         
         time_value = frame_idx * 0.02
-        ax.set_title(f'CFD Unsteady Flow - Time: {time_value:.3f}s', fontsize=14)
-        ax.set_xlabel('X')
-        ax.set_ylabel('Y')
-        ax.set_aspect('equal')
+        fig.suptitle(f'CFD Unsteady Flow - Time: {time_value:.3f}s', fontsize=16, fontweight='bold')
     
     # Create animation
     anim = animation.FuncAnimation(fig, animate, frames=len(vtk_files), 

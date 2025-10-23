@@ -58,6 +58,10 @@ private:
     std::unique_ptr<UnsteadyLinearSystemSolver> unsteadySolver;
     std::vector<double> previousCirculations;
     
+    // Pressure field calculation (Equation 50)
+    std::vector<std::vector<double>> previousPotential;  // φ(t_n) for time derivative
+    bool firstTimeStep;  // Flag to handle initial step without time derivative
+    
     // Output management
     int outputCounter;
     std::string baseOutputName;

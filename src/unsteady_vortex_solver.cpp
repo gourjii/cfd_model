@@ -118,7 +118,7 @@ void UnsteadyLinearSystemSolver::buildUnsteadySystem(
 // UnsteadyVortexSolver implementation
 UnsteadyVortexSolver::UnsteadyVortexSolver(int nx, int ny, double dx, double dy)
     : CFDSolver(nx, ny, dx, dy), currentTime(0.0), startTime(0.0),
-      lastSheddingTime(0.0), outputCounter(0), baseOutputName("unsteady_vortex") {
+      lastSheddingTime(0.0), firstTimeStep(true), outputCounter(0), baseOutputName("unsteady_vortex") {
     
     // Initialize vortex tracker
     vortexTracker = std::make_unique<VortexTracker>();
@@ -126,6 +126,9 @@ UnsteadyVortexSolver::UnsteadyVortexSolver(int nx, int ny, double dx, double dy)
     // Set default parameters
     timeParams = TimeIntegrationParams();
     sheddingParams = VortexSheddingParams();
+    
+    // Initialize previousPotential storage
+    previousPotential.resize(nx, std::vector<double>(ny, 0.0));
     
     std::cout << "UnsteadyVortexSolver initialized with " << nx << "x" << ny << " grid" << std::endl;
 }
@@ -383,10 +386,12 @@ void UnsteadyVortexSolver::shedNewVortices() {
 }
 
 bool UnsteadyVortexSolver::shouldShedVortex() const {
-    // Universal shedding: shed vortices at every time step
-    // Following the mathematical model from slides 17-20, each boundary point
-    // generates one vortex per time step to maintain circulation conservation
-    return true;
+    // Shed vortices every 4th time step to reduce density
+    // Calculate current time step number
+    int timeStepNumber = static_cast<int>(std::round(currentTime / timeParams.timeStep));
+    
+    // Shed only when time step number is divisible by 4
+    return (timeStepNumber % 4 == 0);
 }
 
 // ========================================================================
@@ -572,14 +577,69 @@ void UnsteadyVortexSolver::updateBoundaryConditions() {
     // TODO: Update boundary conditions for time-dependent case
 }
 
+// ========================================================================
+// FORMULA REFERENCE: Equation (50) from mathematical documentation
+// Pressure coefficient calculation for unsteady flow:
+// C_P(x,y,t) = 2(p - p_∞)/(ρV_∞²) = 1 - (∇φ)²/V_∞² - (2/V_∞²)(∂φ/∂t)
+//
+// Where:
+// - (∇φ)² = u² + v² (velocity magnitude squared)
+// - ∂φ/∂t = (φ(t_{n+1}) - φ(t_n)) / Δt (finite difference approximation)
+// - V_∞² = u_∞² + v_∞² (free stream velocity squared)
+// ========================================================================
 void UnsteadyVortexSolver::calculateUnsteadyPressureField() {
-    // TODO: Implement pressure calculation with time derivatives
+    // Calculate free stream velocity magnitude squared
+    double V_inf_squared = getFreeStreamU() * getFreeStreamU() + 
+                          getFreeStreamV() * getFreeStreamV();
+    
+    // Avoid division by zero
+    if (V_inf_squared < 1e-12) {
+        V_inf_squared = 1.0; // Use default if free stream is zero
+    }
+    
+    // Calculate time step for time derivative
+    double dt = timeParams.adaptiveTimeStep ? calculateAdaptiveTimeStep() : timeParams.timeStep;
+    
+    // Calculate pressure coefficient at each grid point
+    for (int i = 0; i < fieldData.nx; ++i) {
+        for (int j = 0; j < fieldData.ny; ++j) {
+            // Term 1: 1 (reference pressure)
+            double term1 = 1.0;
+            
+            // Term 2: -(∇φ)²/V_∞² (steady velocity term)
+            double u = fieldData.u[i][j];
+            double v = fieldData.v[i][j];
+            double velocity_squared = u*u + v*v;
+            double term2 = -velocity_squared / V_inf_squared;
+            
+            // Term 3: -(2/V_∞²)(∂φ/∂t) (unsteady time derivative term)
+            double term3 = 0.0;
+            if (!firstTimeStep && dt > 1e-12) {
+                // Calculate time derivative using finite difference
+                double dPhi_dt = (fieldData.potential[i][j] - previousPotential[i][j]) / dt;
+                term3 = -(2.0 / V_inf_squared) * dPhi_dt;
+            }
+            
+            // Total pressure coefficient (Equation 50)
+            fieldData.pressureCoefficient[i][j] = term1 + term2 + term3;
+        }
+    }
 }
 
 void UnsteadyVortexSolver::calculateFieldData() {
-    // For now, call parent method
-    // TODO: Override with unsteady pressure calculation
+    // Call parent method to calculate velocity and potential fields
     CFDSolver::calculateFieldData();
+    
+    // Calculate unsteady pressure coefficient using Equation (50)
+    calculateUnsteadyPressureField();
+    
+    // Store current potential for next time step's time derivative calculation
+    previousPotential = fieldData.potential;
+    
+    // After first time step, enable time derivative calculation
+    if (firstTimeStep) {
+        firstTimeStep = false;
+    }
 }
 
 void UnsteadyVortexSolver::writeUnsteadyVTKFile(const std::string& filename) {

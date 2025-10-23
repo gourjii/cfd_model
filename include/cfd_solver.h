@@ -13,6 +13,7 @@ struct FieldData {
     std::vector<std::vector<double>> streamFunction;  // stream function ψ
     std::vector<std::vector<double>> velocityMagnitude;  // |V|
     std::vector<std::vector<double>> vorticity;  // vorticity
+    std::vector<std::vector<double>> pressureCoefficient;  // C_P - pressure coefficient
     int nx, ny;
     double dx, dy;
     

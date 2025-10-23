@@ -22,6 +22,7 @@ FieldData::FieldData(int nx, int ny, double dx, double dy)
     streamFunction.resize(nx, std::vector<double>(ny));
     velocityMagnitude.resize(nx, std::vector<double>(ny));
     vorticity.resize(nx, std::vector<double>(ny));
+    pressureCoefficient.resize(nx, std::vector<double>(ny));
 }
 
 // CFDSolver implementation
@@ -369,6 +370,15 @@ void CFDSolver::writeVTKFile(const std::string& filename, double timeValue) {
     for (int j = 0; j < fieldData.ny; ++j) {
         for (int i = 0; i < fieldData.nx; ++i) {
             file << fieldData.vorticity[i][j] << "\n";
+        }
+    }
+    
+    // Write pressure coefficient (Equation 50)
+    file << "\nSCALARS pressure_coefficient float 1\n";
+    file << "LOOKUP_TABLE default\n";
+    for (int j = 0; j < fieldData.ny; ++j) {
+        for (int i = 0; i < fieldData.nx; ++i) {
+            file << fieldData.pressureCoefficient[i][j] << "\n";
         }
     }
     
