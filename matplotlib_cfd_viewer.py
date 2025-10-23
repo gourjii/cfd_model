@@ -242,7 +242,43 @@ def parse_vtk_structured_grid(filename):
         'line_segments': line_segments
     }
 
-def create_2d_visualization(data, title="CFD Visualization", save_path=None, obstacle_data=None):
+def parse_vtk_wake_vortices(filename):
+    """Parse VTK POLYDATA file containing wake vortices"""
+    if not os.path.exists(filename):
+        return None
+    
+    with open(filename, 'r') as f:
+        lines = f.readlines()
+    
+    # Find POINTS section
+    points = []
+    for i, line in enumerate(lines):
+        if line.startswith('POINTS'):
+            num_points = int(line.split()[1])
+            # Read point coordinates
+            for j in range(i+1, len(lines)):
+                coords = lines[j].strip().split()
+                if len(coords) >= 3:
+                    try:
+                        points.append([float(coords[0]), float(coords[1])])
+                    except:
+                        break
+                if len(points) >= num_points:
+                    break
+            break
+    
+    return np.array(points) if points else None
+
+def add_wake_vortices_to_plot(ax, vtk_filename):
+    """Add wake vortices to existing plot"""
+    wake_filename = vtk_filename.replace('_flow_flow_', '_flow_wake_')
+    wake_vortices = parse_vtk_wake_vortices(wake_filename)
+    if wake_vortices is not None and len(wake_vortices) > 0:
+        ax.scatter(wake_vortices[:, 0], wake_vortices[:, 1], 
+                  c='red', s=30, marker='o', edgecolors='darkred', 
+                  linewidths=1, zorder=10, alpha=0.9)
+
+def create_2d_visualization(data, title="CFD Visualization", save_path=None, obstacle_data=None, vtk_filename=None):
     """Create 2D visualization of CFD data with obstacle overlay"""
     if data is None or data['points'] is None:
         return None
@@ -306,6 +342,11 @@ def create_2d_visualization(data, title="CFD Visualization", save_path=None, obs
             x_coords = [segment[0][0], segment[1][0]]
             y_coords = [segment[0][1], segment[1][1]]
             ax2.plot(x_coords, y_coords, 'k-', linewidth=4, label='Obstacle' if segment == obstacle_data[0] else "")
+    
+    # Add wake vortices to both plots
+    if vtk_filename is not None:
+        add_wake_vortices_to_plot(ax1, vtk_filename)
+        add_wake_vortices_to_plot(ax2, vtk_filename)
     
     plt.tight_layout()
     
@@ -371,6 +412,14 @@ def create_animation(vtk_files, output_path="cfd_animation.gif", fps=2, obstacle
                 x_coords = [segment[0][0], segment[1][0]]
                 y_coords = [segment[0][1], segment[1][1]]
                 ax.plot(x_coords, y_coords, 'k-', linewidth=4)
+        
+        # Add wake vortices overlay
+        wake_filename = vtk_files[frame_idx].replace('_flow_flow_', '_flow_wake_')
+        wake_vortices = parse_vtk_wake_vortices(wake_filename)
+        if wake_vortices is not None and len(wake_vortices) > 0:
+            ax.scatter(wake_vortices[:, 0], wake_vortices[:, 1], 
+                      c='red', s=30, marker='o', edgecolors='darkred', 
+                      linewidths=1, zorder=10, alpha=0.9)
         
         time_value = frame_idx * 0.02
         ax.set_title(f'CFD Unsteady Flow - Time: {time_value:.3f}s', fontsize=14)
@@ -448,7 +497,7 @@ def main():
             title = f"CFD Flow - Time: {time_value:.3f}s"
             
             img_path = os.path.join(img_dir, f"frame_{i:04d}.png")
-            fig = create_2d_visualization(data, title, img_path, obstacle_data)
+            fig = create_2d_visualization(data, title, img_path, obstacle_data, vtk_file)
             if fig:
                 plt.close(fig)
     else:
@@ -460,7 +509,7 @@ def main():
         time_value = frame_idx * 0.02
         title = f"CFD Flow - Time: {time_value:.3f}s (Frame {frame_idx+1}/{len(vtk_files)})"
         
-        fig = create_2d_visualization(data, title, None, obstacle_data)
+        fig = create_2d_visualization(data, title, None, obstacle_data, vtk_file)
         if fig:
             plt.show()
 
